@@ -1,5 +1,8 @@
 import streamlit as st
 import requests
+import asyncio
+import httpx
+import threading
 
 FASTAPI_BASE_URL = "http://llm:8000"
 START_URL = f"{FASTAPI_BASE_URL}/start"
@@ -18,35 +21,29 @@ def initialize_session():
         st.session_state.question_count = 0
 
 def call_start_endpoint(user_info: dict):
-    try:
-        response = requests.post(START_URL, json=user_info)
-        response.raise_for_status()
-        data = response.json()["question"]
-        return data
-    except Exception as e:
-        st.error(f"Error calling start endpoint: {e}")
-        return None
+    response = requests.post(START_URL, json=user_info)
+    response.raise_for_status()
+    data = response.json()["question"]
+    return data
 
-def call_chat_endpoint(user_response: str):
-    try:
+async def call_chat_endpoint(user_response: str):
+    timeout = httpx.Timeout(30.0)
+    async with httpx.AsyncClient(timeout=timeout) as client:
         payload = {"user_input": user_response}
-        response = requests.post(CHAT_URL, json=payload)
+        response = await client.post(CHAT_URL, json=payload)
         response.raise_for_status()
         data = response.json()["question"]
         return data
-    except Exception as e:
-        st.error(f"Error calling chat endpoint: {e}")
-        return None
 
-def call_finish_endpoint():
-    try:
-        response = requests.post(FINISH_URL)
+async def call_finish_endpoint():
+    async with httpx.AsyncClient(timeout=httpx.Timeout(30.0)) as client:
+        response = await client.post(FINISH_URL)
         response.raise_for_status()
         data = response.json()
         return data
-    except Exception as e:
-        st.error(f"Error calling finish endpoint: {e}")
-        return None
+    
+def finish_in_background():
+    asyncio.run(call_finish_endpoint())
 
 def reset_app():
     for key in list(st.session_state.keys()):
@@ -92,7 +89,7 @@ if st.session_state.phase == "chat":
     if st.session_state.question_count >= MAX_QUESTIONS:
         if st.button("Finish Interview"):
             with st.spinner("Finishing the interview..."):
-                finish_response = call_finish_endpoint()
+                threading.Thread(target=finish_in_background, daemon=True).start()
                 st.session_state.phase = "finished"
             st.rerun()
     else:
@@ -104,7 +101,7 @@ if st.session_state.phase == "chat":
                     "content": user_input
                 })
 
-                chat_response = call_chat_endpoint(user_input)
+                chat_response = asyncio.run(call_chat_endpoint(user_input))
                 if chat_response:
                     st.session_state.chat_history.append({
                         "role": "assistant",
