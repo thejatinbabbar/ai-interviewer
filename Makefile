@@ -1,10 +1,10 @@
 check-format:
 	black --check --line-length 120 . ; \
-	isort --check-only . ;
+	isort --check-only --profile black . ;
 
 format:
 	black --line-length 120 . ; \
-	isort .
+	isort --profile black .
 
 clean:
 	rm -rf *.pyc

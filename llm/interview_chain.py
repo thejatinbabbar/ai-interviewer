@@ -1,12 +1,19 @@
 import json
-from llm.config import interview_system_prompt, initial_interview_prompt_structure, evaluation_system_prompt, initial_evaluation_prompt_structure
-from langchain_core.prompts import PromptTemplate
+import os
+
+import requests
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_community.document_loaders import DirectoryLoader, TextLoader
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
-from langchain_community.document_loaders import DirectoryLoader, TextLoader
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-import requests
-import os
+from langchain_core.prompts import PromptTemplate
+
+from llm.config import (
+    evaluation_system_prompt,
+    initial_evaluation_prompt_structure,
+    initial_interview_prompt_structure,
+    interview_system_prompt,
+)
 
 
 class InterviewChain:
@@ -26,7 +33,7 @@ class InterviewChain:
             "role": "",
             "email": "",
         }
-    
+
     def init_new_session(self):
         self.history = ""
         self.init_candidate_info()
@@ -40,7 +47,7 @@ class InterviewChain:
         docs = splitter.split_documents(docs)
         vectorstore = FAISS.from_documents(docs, embedding)
         return vectorstore
-    
+
     def add_candidate_info(self, name, role, email):
         self.candidate_info["name"] = name
         self.candidate_info["role"] = role
@@ -48,7 +55,7 @@ class InterviewChain:
 
     def create_question_prompt(self, context, user_input):
         prompt = interview_system_prompt + initial_interview_prompt_structure
-        
+
         prompt_template = PromptTemplate.from_template(prompt)
         prompt = prompt_template.format(
             context=context,
@@ -57,7 +64,7 @@ class InterviewChain:
         )
 
         return prompt
-    
+
     def create_evaluation_prompt(self):
 
         prompt = evaluation_system_prompt + initial_evaluation_prompt_structure
@@ -68,15 +75,15 @@ class InterviewChain:
         )
 
         return prompt
-    
+
     def create_finish_prompt(self):
         prompt = ""
-        
+
         # prompt_template = PromptTemplate.from_template(prompt)
         # prompt = prompt_template.format(history=self.history)
 
         return prompt
-    
+
     def update_history(self, text, role):
         self.history += f"{role}: {text}\n"
 
@@ -95,37 +102,39 @@ class InterviewChain:
         self.update_history(response, "Chatbot")
 
         self.question_count += 1
-        
+
         return response
-    
+
     def generate_evaluation(self):
 
         prompt = self.create_evaluation_prompt()
 
         response = self.call_llm(prompt)
         return response
-    
+
     def finish_interview(self, user_input):
         self.update_history(user_input, "User")
-        
+
         prompt = self.create_finish_prompt(user_input)
         response = self.call_llm(prompt)
         self.update_history(response, "Chatbot")
 
         return response
-    
+
     def save_interview(self, evaluation):
         interview = {
             "candidate_info": self.candidate_info,
             "history": self.history,
             "evaluation": evaluation,
         }
-        interview_filename = f'interview_{self.candidate_info["name"]}_{self.candidate_info["role"]}.json'.replace(" ", "_")
+        interview_filename = f'interview_{self.candidate_info["name"]}_{self.candidate_info["role"]}.json'.replace(
+            " ", "_"
+        )
         with open("artifacts/interviews/" + interview_filename, "w") as f:
             json.dump(interview, f)
 
         return
-    
+
     def call_llm(self, prompt):
         data = {
             "model": "llama3.2:1b",
