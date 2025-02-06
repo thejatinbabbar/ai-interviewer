@@ -1,11 +1,14 @@
 import streamlit as st
 import requests
+import asyncio
+import httpx
+import threading
+import os
 
-FASTAPI_BASE_URL = "http://llm:8000"
+FASTAPI_BASE_URL = os.environ["BACKEND_URL"]
 START_URL = f"{FASTAPI_BASE_URL}/start"
 CHAT_URL = f"{FASTAPI_BASE_URL}/generate_question"
 FINISH_URL = f"{FASTAPI_BASE_URL}/generate_evaluation"
-MAX_QUESTIONS = 5
 
 def initialize_session():
     if 'phase' not in st.session_state:
@@ -14,39 +17,33 @@ def initialize_session():
         st.session_state.user_info = {}
     if 'chat_history' not in st.session_state:
         st.session_state.chat_history = []
-    if 'question_count' not in st.session_state:
-        st.session_state.question_count = 0
+    if 'finish_interview' not in st.session_state:
+        st.session_state.finish_interview = False
 
 def call_start_endpoint(user_info: dict):
-    try:
-        response = requests.post(START_URL, json=user_info)
-        response.raise_for_status()
-        data = response.json()["question"]
-        return data
-    except Exception as e:
-        st.error(f"Error calling start endpoint: {e}")
-        return None
+    response = requests.post(START_URL, json=user_info)
+    response.raise_for_status()
+    data = response.json()["question"]
+    return data
 
-def call_chat_endpoint(user_response: str):
-    try:
+async def call_chat_endpoint(user_response: str):
+    timeout = httpx.Timeout(30.0)
+    async with httpx.AsyncClient(timeout=timeout) as client:
         payload = {"user_input": user_response}
-        response = requests.post(CHAT_URL, json=payload)
-        response.raise_for_status()
-        data = response.json()["question"]
-        return data
-    except Exception as e:
-        st.error(f"Error calling chat endpoint: {e}")
-        return None
-
-def call_finish_endpoint():
-    try:
-        response = requests.post(FINISH_URL)
+        response = await client.post(CHAT_URL, json=payload)
         response.raise_for_status()
         data = response.json()
         return data
-    except Exception as e:
-        st.error(f"Error calling finish endpoint: {e}")
-        return None
+
+async def call_finish_endpoint():
+    async with httpx.AsyncClient(timeout=httpx.Timeout(30.0)) as client:
+        response = await client.post(FINISH_URL)
+        response.raise_for_status()
+        data = response.json()
+        return data
+    
+def finish_in_background():
+    asyncio.run(call_finish_endpoint())
 
 def reset_app():
     for key in list(st.session_state.keys()):
@@ -77,7 +74,6 @@ if st.session_state.phase == "form":
                             "role": "assistant",
                             "content": start_response,
                         })
-                        st.session_state.question_count = 1
                     else:
                         st.sidebar.error("Failed to start the interview. Please try again.")
                 st.rerun()
@@ -89,10 +85,11 @@ if st.session_state.phase == "chat":
         with st.chat_message(msg["role"]):
             st.write(msg["content"])
     
-    if st.session_state.question_count >= MAX_QUESTIONS:
+    if st.session_state.finish_interview:
+        st.info("The interview is complete. Please click 'Finish Interview' to submit your responses.")
         if st.button("Finish Interview"):
             with st.spinner("Finishing the interview..."):
-                finish_response = call_finish_endpoint()
+                threading.Thread(target=finish_in_background, daemon=True).start()
                 st.session_state.phase = "finished"
             st.rerun()
     else:
@@ -103,16 +100,13 @@ if st.session_state.phase == "chat":
                     "role": "user",
                     "content": user_input
                 })
-
-                chat_response = call_chat_endpoint(user_input)
-                if chat_response:
-                    st.session_state.chat_history.append({
-                        "role": "assistant",
-                        "content": chat_response,
-                    })
-                    st.session_state.question_count += 1
-                else:
-                    st.error("Failed to get a response from the AI.")
+                chat_data = asyncio.run(call_chat_endpoint(user_input))
+                st.session_state.chat_history.append({
+                    "role": "assistant",
+                    "content": chat_data["question"]
+                })
+                if chat_data.get("finish_interview", False):
+                    st.session_state.finish_interview = True
             st.rerun()
 
 if st.session_state.phase == "finished":

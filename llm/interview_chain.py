@@ -6,15 +6,19 @@ from langchain_community.vectorstores import FAISS
 from langchain_community.document_loaders import DirectoryLoader, TextLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 import requests
+import os
 
 
 class InterviewChain:
 
     def __init__(self):
         self.llm = None
+        self.llm_url = os.environ["OLLAMA_URL"]
         self.vectorstore = self.init_vectorstore()
         self.candidate_info = None
         self.history = None
+        self.max_questions = 3
+        self.question_count = 0
 
     def init_candidate_info(self):
         self.candidate_info = {
@@ -26,6 +30,7 @@ class InterviewChain:
     def init_new_session(self):
         self.history = ""
         self.init_candidate_info()
+        self.question_count = 0
 
     def init_vectorstore(self):
         embedding = HuggingFaceEmbeddings(model_name="artifacts/models/all-MiniLM-L6-v2")
@@ -64,6 +69,14 @@ class InterviewChain:
 
         return prompt
     
+    def create_finish_prompt(self):
+        prompt = ""
+        
+        # prompt_template = PromptTemplate.from_template(prompt)
+        # prompt = prompt_template.format(history=self.history)
+
+        return prompt
+    
     def update_history(self, text, role):
         self.history += f"{role}: {text}\n"
 
@@ -80,6 +93,8 @@ class InterviewChain:
         prompt = self.create_question_prompt(context, user_input)
         response = self.call_llm(prompt)
         self.update_history(response, "Chatbot")
+
+        self.question_count += 1
         
         return response
     
@@ -88,6 +103,15 @@ class InterviewChain:
         prompt = self.create_evaluation_prompt()
 
         response = self.call_llm(prompt)
+        return response
+    
+    def finish_interview(self, user_input):
+        self.update_history(user_input, "User")
+        
+        prompt = self.create_finish_prompt(user_input)
+        response = self.call_llm(prompt)
+        self.update_history(response, "Chatbot")
+
         return response
     
     def save_interview(self, evaluation):
@@ -109,5 +133,5 @@ class InterviewChain:
             "stream": False,
             "max_tokens": 200,
         }
-        response = requests.post("http://ollama:11434/api/generate", json=data)
+        response = requests.post(f"{self.llm_url}/api/generate", json=data)
         return response.json()["response"]
