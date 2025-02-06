@@ -75,8 +75,6 @@ class InterviewChain:
         context = self.get_context()
 
         prompt = self.create_question_prompt(context, user_input)
-
-        print("Prompt:", prompt)
         response = self.call_llm(prompt)
         self.update_history(response, "Chatbot")
         
@@ -108,4 +106,4 @@ class InterviewChain:
             "stream": False,
         }
         response = requests.post("http://ollama:11434/api/generate", json=data)
-        return response.json()
+        return response.json()["response"]

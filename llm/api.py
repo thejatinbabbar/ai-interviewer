@@ -10,7 +10,7 @@ class CandidateInfo(BaseModel):
     role: str
     email: str
 
-class QuestionRequest(BaseModel):
+class UserInput(BaseModel):
     user_input: str
 
 @app.post("/start")
@@ -22,12 +22,12 @@ async def start(request: CandidateInfo):
         email=request.email
     )
     llm_response = interview_chain.generate_question(user_input)
-    return {"question": llm_response["response"]}
+    return {"question": llm_response}
 
 @app.post("/generate_question")
-async def generate_question(request: QuestionRequest):
+async def generate_question(request: UserInput):
     llm_response = interview_chain.generate_question(request.user_input)
-    return {"question": llm_response["response"]}
+    return {"question": llm_response}
 
 @app.post("/generate_evaluation")
 async def generate_evaluation():
