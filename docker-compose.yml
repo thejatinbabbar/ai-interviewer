@@ -23,6 +23,17 @@ services:
     networks:
       - localnet
 
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    ports:
+      - "8501:8501"
+    networks:
+      - localnet
+    volumes:
+      - ./frontend:/app/frontend
+
 networks:
   localnet:
     driver: bridge
