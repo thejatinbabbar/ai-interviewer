@@ -16,6 +16,7 @@ class UserInput(BaseModel):
 @app.post("/start")
 async def start(request: CandidateInfo):
     user_input = f"Hi, my name is {request.name}, and I applied for the role of {request.role}. I am ready for the interview."
+    interview_chain.init_new_session()
     interview_chain.add_candidate_info(
         name=request.name, 
         role=request.role,
