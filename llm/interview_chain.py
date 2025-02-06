@@ -33,7 +33,6 @@ class InterviewChain:
             "role": "",
             "email": "",
         }
-
     def init_new_session(self):
         self.history = ""
         self.init_candidate_info()
@@ -47,7 +46,6 @@ class InterviewChain:
         docs = splitter.split_documents(docs)
         vectorstore = FAISS.from_documents(docs, embedding)
         return vectorstore
-
     def add_candidate_info(self, name, role, email):
         self.candidate_info["name"] = name
         self.candidate_info["role"] = role
@@ -55,7 +53,6 @@ class InterviewChain:
 
     def create_question_prompt(self, context, user_input):
         prompt = interview_system_prompt + initial_interview_prompt_structure
-
         prompt_template = PromptTemplate.from_template(prompt)
         prompt = prompt_template.format(
             context=context,
@@ -64,7 +61,6 @@ class InterviewChain:
         )
 
         return prompt
-
     def create_evaluation_prompt(self):
 
         prompt = evaluation_system_prompt + initial_evaluation_prompt_structure
@@ -83,7 +79,6 @@ class InterviewChain:
         # prompt = prompt_template.format(history=self.history)
 
         return prompt
-
     def update_history(self, text, role):
         self.history += f"{role}: {text}\n"
 
@@ -120,7 +115,6 @@ class InterviewChain:
         self.update_history(response, "Chatbot")
 
         return response
-
     def save_interview(self, evaluation):
         interview = {
             "candidate_info": self.candidate_info,
@@ -134,7 +128,6 @@ class InterviewChain:
             json.dump(interview, f)
 
         return
-
     def call_llm(self, prompt):
         data = {
             "model": "llama3.2:1b",

@@ -29,7 +29,6 @@ def call_start_endpoint(user_info: dict):
     data = response.json()["question"]
     return data
 
-
 async def call_chat_endpoint(user_response: str):
     timeout = httpx.Timeout(30.0)
     async with httpx.AsyncClient(timeout=timeout) as client:
@@ -38,7 +37,6 @@ async def call_chat_endpoint(user_response: str):
         response.raise_for_status()
         data = response.json()
         return data
-
 
 async def call_finish_endpoint():
     async with httpx.AsyncClient(timeout=httpx.Timeout(30.0)) as client:
@@ -57,7 +55,6 @@ def reset_app():
         del st.session_state[key]
     st.rerun()
 
-
 initialize_session()
 
 if st.session_state.phase == "form":
@@ -66,7 +63,6 @@ if st.session_state.phase == "form":
         name = st.text_input("Name")
         email = st.text_input("Email")
         role = st.text_input("Role")
-
         submitted = st.form_submit_button("Submit")
         if submitted:
             if not name or not email or not role:

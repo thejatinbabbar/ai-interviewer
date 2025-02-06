@@ -1,0 +1,197 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: llm-config
+data:
+  OLLAMA_URL: "http://ollama-service:11434"
+  BACKEND_URL: "http://llm-service:8000"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: llm-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: llm
+  template:
+    metadata:
+      labels:
+        app: llm
+    spec:
+      initContainers:
+      - name: seed-artifacts
+        image: my-artifacts:latest
+        imagePullPolicy: Never
+        command: ['sh', '-c', 'cp -r /seed/* /app/artifacts/']
+        volumeMounts:
+          - name: artifacts-volume
+            mountPath: /app/artifacts
+      containers:
+      - name: llm
+        image: llm-image:latest
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 8000
+        envFrom:
+        - configMapRef:
+            name: llm-config
+        volumeMounts:
+        - name: artifacts-volume
+          mountPath: /app/artifacts
+      volumes:
+      - name: artifacts-volume
+        persistentVolumeClaim:
+          claimName: artifacts-pvc
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: artifacts-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: llm-service
+spec:
+  type: NodePort
+  selector:
+    app: llm
+  ports:
+  - port: 8000
+    targetPort: 8000
+    nodePort: 30080
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ollama-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ollama
+  template:
+    metadata:
+      labels:
+        app: ollama
+    spec:
+      containers:
+      - name: ollama
+        image: ollama/ollama:latest
+        ports:
+        - containerPort: 11434
+        volumeMounts:
+        - name: ollama-data
+          mountPath: /root/.ollama
+      volumes:
+      - name: ollama-data
+        persistentVolumeClaim:
+          claimName: ollama-pvc
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ollama-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ollama-service
+spec:
+  type: NodePort
+  selector:
+    app: ollama
+  ports:
+  - port: 11434
+    targetPort: 11434
+    nodePort: 30114
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+    spec:
+      containers:
+      - name: frontend
+        image: frontend-image:latest
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 8501
+        envFrom:
+        - configMapRef:
+            name: llm-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend-service
+spec:
+  type: NodePort
+  selector:
+    app: frontend
+  ports:
+  - port: 8501
+    targetPort: 8501
+    nodePort: 30851
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: chatbot-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  rules:
+  - host: llm.local
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: llm-service
+            port:
+              number: 8000
+  - host: ollama.local
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: ollama-service
+            port:
+              number: 11434
+  - host: frontend.local
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: frontend-service
+            port:
+              number: 8501
