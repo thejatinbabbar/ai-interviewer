@@ -3,12 +3,12 @@ import requests
 import asyncio
 import httpx
 import threading
+import os
 
-FASTAPI_BASE_URL = "http://llm:8000"
+FASTAPI_BASE_URL = os.environ["BACKEND_URL"]
 START_URL = f"{FASTAPI_BASE_URL}/start"
 CHAT_URL = f"{FASTAPI_BASE_URL}/generate_question"
 FINISH_URL = f"{FASTAPI_BASE_URL}/generate_evaluation"
-MAX_QUESTIONS = 5
 
 def initialize_session():
     if 'phase' not in st.session_state:
@@ -17,8 +17,8 @@ def initialize_session():
         st.session_state.user_info = {}
     if 'chat_history' not in st.session_state:
         st.session_state.chat_history = []
-    if 'question_count' not in st.session_state:
-        st.session_state.question_count = 0
+    if 'finish_interview' not in st.session_state:
+        st.session_state.finish_interview = False
 
 def call_start_endpoint(user_info: dict):
     response = requests.post(START_URL, json=user_info)
@@ -32,7 +32,7 @@ async def call_chat_endpoint(user_response: str):
         payload = {"user_input": user_response}
         response = await client.post(CHAT_URL, json=payload)
         response.raise_for_status()
-        data = response.json()["question"]
+        data = response.json()
         return data
 
 async def call_finish_endpoint():
@@ -74,7 +74,6 @@ if st.session_state.phase == "form":
                             "role": "assistant",
                             "content": start_response,
                         })
-                        st.session_state.question_count = 1
                     else:
                         st.sidebar.error("Failed to start the interview. Please try again.")
                 st.rerun()
@@ -86,7 +85,8 @@ if st.session_state.phase == "chat":
         with st.chat_message(msg["role"]):
             st.write(msg["content"])
     
-    if st.session_state.question_count >= MAX_QUESTIONS:
+    if st.session_state.finish_interview:
+        st.info("The interview is complete. Please click 'Finish Interview' to submit your responses.")
         if st.button("Finish Interview"):
             with st.spinner("Finishing the interview..."):
                 threading.Thread(target=finish_in_background, daemon=True).start()
@@ -100,16 +100,13 @@ if st.session_state.phase == "chat":
                     "role": "user",
                     "content": user_input
                 })
-
-                chat_response = asyncio.run(call_chat_endpoint(user_input))
-                if chat_response:
-                    st.session_state.chat_history.append({
-                        "role": "assistant",
-                        "content": chat_response,
-                    })
-                    st.session_state.question_count += 1
-                else:
-                    st.error("Failed to get a response from the AI.")
+                chat_data = asyncio.run(call_chat_endpoint(user_input))
+                st.session_state.chat_history.append({
+                    "role": "assistant",
+                    "content": chat_data["question"]
+                })
+                if chat_data.get("finish_interview", False):
+                    st.session_state.finish_interview = True
             st.rerun()
 
 if st.session_state.phase == "finished":
