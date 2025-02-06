@@ -1,0 +1,28 @@
+services:
+  llm:
+    build:
+      context: .
+      dockerfile: llm/Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - OLLAMA_URL=http://ollama:11434/
+      - FASTAPI_PORT=8000
+    networks:
+      - localnet
+    volumes:
+      - ./llm:/app/llm
+      - ./artifacts:/app/artifacts
+
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ~/.ollama:/root/.ollama
+    networks:
+      - localnet
+
+networks:
+  localnet:
+    driver: bridge
