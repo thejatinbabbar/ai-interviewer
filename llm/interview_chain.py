@@ -1,7 +1,6 @@
 import json
 from llm.config import interview_system_prompt, initial_interview_prompt_structure, evaluation_system_prompt, initial_evaluation_prompt_structure
 from langchain_core.prompts import PromptTemplate
-from langchain_ollama import OllamaLLM
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
 from langchain_community.document_loaders import DirectoryLoader, TextLoader
@@ -14,15 +13,19 @@ class InterviewChain:
     def __init__(self):
         self.llm = None
         self.vectorstore = self.init_vectorstore()
+        self.candidate_info = None
+        self.history = None
+
+    def init_candidate_info(self):
         self.candidate_info = {
             "name": "",
             "role": "",
             "email": "",
         }
+    
+    def init_new_session(self):
         self.history = ""
-
-    def init_llm(self):
-        return OllamaLLM(model="llama3")
+        self.init_candidate_info()
 
     def init_vectorstore(self):
         embedding = HuggingFaceEmbeddings(model_name="artifacts/models/all-MiniLM-L6-v2")
@@ -104,6 +107,7 @@ class InterviewChain:
             "model": "llama3.2:1b",
             "prompt": prompt,
             "stream": False,
+            "max_tokens": 200,
         }
         response = requests.post("http://ollama:11434/api/generate", json=data)
         return response.json()["response"]

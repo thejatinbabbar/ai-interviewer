@@ -60,15 +60,15 @@ if st.session_state.phase == "form":
     with st.sidebar.form(key="user_info_form"):
         name = st.text_input("Name")
         email = st.text_input("Email")
-        age = st.text_input("Role")
+        role = st.text_input("Role")
         
         submitted = st.form_submit_button("Submit")
         if submitted:
-            if not name or not email or age is None:
+            if not name or not email or not role:
                 st.sidebar.error("All fields are required!")
             else:
                 st.session_state.phase = "chat"
-                user_info = {"name": name, "email": email, "role": age}
+                user_info = {"name": name, "email": email, "role": role}
                 st.session_state.user_info = user_info
                 with st.spinner("Starting the interview..."):
                     start_response = call_start_endpoint(user_info)
@@ -80,6 +80,7 @@ if st.session_state.phase == "form":
                         st.session_state.question_count = 1
                     else:
                         st.sidebar.error("Failed to start the interview. Please try again.")
+                st.rerun()
 
 if st.session_state.phase == "chat":
     st.title("AI Interviewer Chat")
@@ -93,6 +94,7 @@ if st.session_state.phase == "chat":
             with st.spinner("Finishing the interview..."):
                 finish_response = call_finish_endpoint()
                 st.session_state.phase = "finished"
+            st.rerun()
     else:
         user_input = st.chat_input("Your Response", key="chat_input")
         if user_input:
@@ -101,7 +103,7 @@ if st.session_state.phase == "chat":
                     "role": "user",
                     "content": user_input
                 })
-                
+
                 chat_response = call_chat_endpoint(user_input)
                 if chat_response:
                     st.session_state.chat_history.append({
@@ -111,6 +113,7 @@ if st.session_state.phase == "chat":
                     st.session_state.question_count += 1
                 else:
                     st.error("Failed to get a response from the AI.")
+            st.rerun()
 
 if st.session_state.phase == "finished":
     st.title("Thank You for Participating in the Interview!")
