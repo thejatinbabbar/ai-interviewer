@@ -12,7 +12,8 @@ CHAT_URL = f"{FASTAPI_BASE_URL}/generate_question"
 FINISH_URL = f"{FASTAPI_BASE_URL}/generate_evaluation"
 
 
-def initialize_session():
+def initialize_session() -> None:
+    """Initialize session_state variables if they do not exist."""
     if "phase" not in st.session_state:
         st.session_state.phase = "form"
     if "user_info" not in st.session_state:
@@ -23,14 +24,32 @@ def initialize_session():
         st.session_state.finish_interview = False
 
 
-def call_start_endpoint(user_info: dict):
+def call_start_endpoint(user_info: dict) -> str:
+    """
+    Call the start endpoint to get the first interview question.
+
+    Args:
+        user_info: Candidate information.
+
+    Returns:
+        str: The starting question.
+    """
     response = requests.post(START_URL, json=user_info)
     response.raise_for_status()
-    data = response.json()["question"]
-    return data
+    data = response.json()
+    return data["question"]
 
 
-async def call_chat_endpoint(user_response: str):
+async def call_chat_endpoint(user_response: str) -> dict:
+    """
+    Asynchronously call the chat endpoint to generate the next interview question.
+
+    Args:
+        user_response (str): The candidate's text response.
+
+    Returns:
+        The response data including the question.
+    """
     async with httpx.AsyncClient(timeout=None) as client:
         payload = {"user_input": user_response}
         response = await client.post(CHAT_URL, json=payload)
@@ -39,7 +58,13 @@ async def call_chat_endpoint(user_response: str):
         return data
 
 
-async def call_finish_endpoint():
+async def call_finish_endpoint() -> dict:
+    """
+    Asynchronously call the finish endpoint to complete the interview.
+
+    Returns:
+        dict: The data returned after finishing the interview.
+    """
     async with httpx.AsyncClient(timeout=None) as client:
         response = await client.post(FINISH_URL)
         response.raise_for_status()
@@ -47,18 +72,22 @@ async def call_finish_endpoint():
         return data
 
 
-def finish_in_background():
+def finish_in_background() -> None:
+    """Run the finish endpoint call in a background thread."""
     asyncio.run(call_finish_endpoint())
 
 
-def reset_app():
+def reset_app() -> None:
+    """Reset all session state variables and reload the app."""
     for key in list(st.session_state.keys()):
         del st.session_state[key]
     st.rerun()
 
 
+# Initialize the user session.
 initialize_session()
 
+# Render the form if in the initial phase.
 if st.session_state.phase == "form":
     st.sidebar.header("Enter Your Information")
     with st.sidebar.form(key="user_info_form"):
@@ -86,13 +115,13 @@ if st.session_state.phase == "form":
                         st.sidebar.error("Failed to start the interview. Please try again.")
                 st.rerun()
 
+# Render the chat interface.
 if st.session_state.phase == "chat":
     st.title("AI Interviewer Chat")
-
+    # Display each message in the chat history.
     for msg in st.session_state.chat_history:
         with st.chat_message(msg["role"]):
             st.write(msg["content"])
-
     if st.session_state.finish_interview:
         st.info("The interview is complete. Please click 'Finish Interview' to submit your responses.")
         if st.button("Finish Interview"):

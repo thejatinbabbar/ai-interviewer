@@ -16,34 +16,49 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 
 
 class InterviewChain:
+    """
+    Manages the interview session, including generating questions, evaluating responses, and logging the conversation.
+    """
 
-    def __init__(self, config):
+    def __init__(self, config: dict) -> None:
+        """
+        Initialize the InterviewChain with configuration data.
+
+        Args:
+            config (dict): Configuration parameters for interview, vectorstore, and LLM.
+        """
         self.config = config
         self.logger = logging.getLogger(__name__)
         self.llm_url = os.environ["OLLAMA_URL"]
         self.db_url = os.environ["DB_SERVICE_URL"]
-        self.candidate_info = None
-        self.history = None
+        self.candidate_info = {}
+        self.history = ""
         self.max_questions = self.config["max_questions"]
         self.question_count = 0
         self.vectorstore = self.init_vectorstore()
         self.session_id = None
 
-    def init_candidate_info(self):
-        self.candidate_info = {
-            "name": "",
-            "role": "",
-            "email": "",
-        }
+    def init_candidate_info(self) -> None:
+        """Initialize an empty candidate info dictionary."""
+        self.candidate_info = {"name": "", "role": "", "email": ""}
 
-    def init_new_session(self):
+    def init_new_session(self) -> None:
+        """
+        Initialize a new interview session by resetting history and candidate info and assigning a new session ID.
+        """
         self.logger.info("Initializing new interview session.")
         self.history = ""
         self.init_candidate_info()
         self.question_count = 0
         self.session_id = uuid.uuid4()
 
-    def init_vectorstore(self):
+    def init_vectorstore(self) -> FAISS:
+        """
+        Initialize the vectorstore from documents in the provided directory.
+
+        Returns:
+            FAISS: A vectorstore built from the split document chunks.
+        """
         embedding = HuggingFaceEmbeddings(model_name=self.config["embedding_model"])
         dir_loader = DirectoryLoader(self.config["rag_dir_path"], glob="**/*.txt", loader_cls=TextLoader)
         docs = dir_loader.load()
@@ -55,12 +70,29 @@ class InterviewChain:
         vectorstore = FAISS.from_documents(docs, embedding)
         return vectorstore
 
-    def add_candidate_info(self, name, role, email):
+    def add_candidate_info(self, name: str, role: str, email: str) -> None:
+        """
+        Add candidate information to the session.
+
+        Args:
+            name (str): Candidate's name.
+            role (str): Role candidate applied for.
+            email (str): Candidate's email address.
+        """
         self.candidate_info["name"] = name
         self.candidate_info["role"] = role
         self.candidate_info["email"] = email
 
-    def create_question_prompt(self, context, user_input):
+    def create_question_prompt(self, context: str) -> str:
+        """
+        Create the prompt for generating the next interview question.
+
+        Args:
+            context (str): Additional context from the vectorstore.
+
+        Returns:
+            str: The formatted prompt.
+        """
         prompt_template = PromptTemplate.from_template(interview_system_prompt)
         prompt = prompt_template.format(
             context=context,
@@ -68,54 +100,86 @@ class InterviewChain:
         )
         return prompt
 
-    def create_evaluation_prompt(self):
+    def create_evaluation_prompt(self) -> str:
+        """
+        Create the prompt for generating an evaluation of the interview conversation.
+
+        Returns:
+            str: The formatted evaluation prompt.
+        """
         prompt_template = PromptTemplate.from_template(evaluation_system_prompt)
-        prompt = prompt_template.format(
-            history=self.history,
-        )
+        prompt = prompt_template.format(history=self.history)
         return prompt
 
-    def update_history(self, text, role):
+    def update_history(self, text: str, role: str) -> None:
+        """
+        Update the conversation history with a new message.
+
+        Args:
+            text (str): Message content.
+            role (str): Role of the sender (e.g., 'User', 'Chatbot', 'AI').
+        """
         self.history += f"{role}: {text}\n"
 
-    def get_context(self):
-        context = self.vectorstore.similarity_search(self.history, k=3)
-        context = "\n".join([doc.page_content for doc in context])
+    def get_context(self) -> str:
+        """
+        Retrieve relevant context via a similarity search on the conversation history.
+
+        Returns:
+            str: Concatenated context string.
+        """
+        results = self.vectorstore.similarity_search(self.history, k=3)
+        context = "\n".join([doc.page_content for doc in results])
         return context
 
-    def generate_question(self, user_input):
+    def generate_question(self, user_input: str) -> str:
+        """
+        Generate a new interview question based on the candidate's input.
 
+        Args:
+            user_input (str): Candidate input text.
+
+        Returns:
+            str: Generated interview question.
+        """
         self.update_history(user_input, "User")
-
         if self.question_count > self.max_questions:
             response = "End of conversation."
         else:
             context = self.get_context()
             prompt = self.create_question_prompt(context, user_input)
             response = self.call_llm(prompt)
-
         self.update_history(response, "Chatbot")
-
         self.question_count += 1
-
         return response
 
-    def get_first_prompt(self):
-        return f"""Hi, my name is {self.candidate_info["name"]}, and I applied for the role of {self.candidate_info["role"]}."""
+    def get_first_prompt(self) -> str:
+        """
+        Generate the initial greeting prompt.
 
-    def generate_evaluation(self):
+        Returns:
+            str: Greeting prompt.
+        """
+        return f"Hi, my name is {self.candidate_info['name']}, and I applied for the role of {self.candidate_info['role']}."
+
+    def generate_evaluation(self) -> str:
+        """
+        Generate an evaluation of the interview conversation.
+
+        Returns:
+            str: Generated evaluation.
+        """
         prompt = self.create_evaluation_prompt()
         response = self.call_llm(prompt)
         return response
 
-    def finish_interview(self, user_input):
-        self.update_history(user_input, "User")
-        prompt = self.create_finish_prompt(user_input)
-        response = self.call_llm(prompt)
-        self.update_history(response, "AI")
-        return response
+    def save_interview(self, evaluation: str) -> None:
+        """
+        Save the complete interview session to the database.
 
-    def save_interview(self, evaluation):
+        Args:
+            evaluation (str): Evaluation text.
+        """
         self.logger.info("Saving interview data.")
         interview = {
             "session_id": str(self.session_id),
@@ -123,22 +187,37 @@ class InterviewChain:
             "conversation": self.history,
             "evaluation": evaluation,
         }
-
         try:
             response = requests.post(f"{self.db_url}/log", json=interview, timeout=None)
             response.raise_for_status()
         except Exception as e:
             self.logger.error(f"Error saving interview data: {e}")
-
         self.logger.info(f"db response: {response}")
-        self.logger.info(f"Interview data saved.")
-        return
+        self.logger.info("Interview data saved.")
 
-    def process_llm_response(self, response):
-        response = response.split("?\n\n")[0]
-        return response
+    def process_llm_response(self, response: str) -> str:
+        """
+        Process the raw LLM response and trim extraneous content.
 
-    def call_llm(self, prompt):
+        Args:
+            response (str): Raw response string.
+
+        Returns:
+            str: Processed response.
+        """
+        processed_response = response.split("?\n\n")[0]
+        return processed_response
+
+    def call_llm(self, prompt: str) -> str:
+        """
+        Call the external LLM API with the provided prompt.
+
+        Args:
+            prompt (str): Prompt to send.
+
+        Returns:
+            str: Processed response from the LLM.
+        """
         self.logger.info("Calling LLM with prompt: %s", prompt)
         data = {
             "model": self.config["ollama"]["model"],
@@ -147,5 +226,5 @@ class InterviewChain:
             "max_tokens": self.config["ollama"]["max_tokens"],
         }
         response = requests.post(f"{self.llm_url}/api/generate", json=data).json()["response"]
-        response = self.process_llm_response(response)
-        return response
+        processed = self.process_llm_response(response)
+        return processed
