@@ -1,5 +1,7 @@
 import json
+import logging
 import os
+import uuid
 
 import requests
 from langchain.text_splitter import RecursiveCharacterTextSplitter
@@ -7,11 +9,11 @@ from langchain_community.document_loaders import DirectoryLoader, TextLoader
 from langchain_community.vectorstores import FAISS
 from langchain_core.prompts import PromptTemplate
 from langchain_huggingface import HuggingFaceEmbeddings
-import logging
+
 from llm.prompts import evaluation_system_prompt, interview_system_prompt
-import uuid
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+
 
 class InterviewChain:
 
@@ -45,7 +47,10 @@ class InterviewChain:
         embedding = HuggingFaceEmbeddings(model_name=self.config["embedding_model"])
         dir_loader = DirectoryLoader(self.config["rag_dir_path"], glob="**/*.txt", loader_cls=TextLoader)
         docs = dir_loader.load()
-        splitter = RecursiveCharacterTextSplitter(chunk_size=self.config["text_splitter"]["chunk_size"], chunk_overlap=self.config["text_splitter"]["chunk_overlap"])
+        splitter = RecursiveCharacterTextSplitter(
+            chunk_size=self.config["text_splitter"]["chunk_size"],
+            chunk_overlap=self.config["text_splitter"]["chunk_overlap"],
+        )
         docs = splitter.split_documents(docs)
         vectorstore = FAISS.from_documents(docs, embedding)
         return vectorstore
@@ -124,7 +129,7 @@ class InterviewChain:
             response.raise_for_status()
         except Exception as e:
             self.logger.error(f"Error saving interview data: {e}")
-        
+
         self.logger.info(f"db response: {response}")
         self.logger.info(f"Interview data saved.")
         return

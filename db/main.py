@@ -1,17 +1,20 @@
+import os
+import sqlite3
+
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-import sqlite3
-import os
 
 app = FastAPI(title="Database Service")
 
 # Use an environment variable for the DB file name; default to conversations.db
 DB_NAME = os.getenv("DB_NAME", "conversations.db")
 
+
 def init_db():
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
-    cursor.execute("""
+    cursor.execute(
+        """
         CREATE TABLE IF NOT EXISTS conversation (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             session_id TEXT,
@@ -20,11 +23,14 @@ def init_db():
             evaluation TEXT,
             timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
         )
-    """)
+    """
+    )
     conn.commit()
     conn.close()
 
+
 init_db()
+
 
 class Conversation(BaseModel):
     session_id: str
@@ -32,8 +38,10 @@ class Conversation(BaseModel):
     conversation: str
     evaluation: str
 
+
 class GetSession(BaseModel):
     session_id: str
+
 
 @app.post("/log")
 async def log_conversation(conv: Conversation):
@@ -42,13 +50,14 @@ async def log_conversation(conv: Conversation):
         cursor = conn.cursor()
         cursor.execute(
             "INSERT INTO conversation (session_id, user, conversation, evaluation) VALUES (?, ?, ?, ?)",
-            (conv.session_id, conv.user, conv.conversation, conv.evaluation)
+            (conv.session_id, conv.user, conv.conversation, conv.evaluation),
         )
         conn.commit()
         conn.close()
         return {"status": "success"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
 
 # Optional: An endpoint to retrieve logs (for debugging/demo purposes)
 @app.get("/get_log")

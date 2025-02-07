@@ -172,3 +172,4 @@ cython_debug/
 .vscode
 artifacts
 .DS_Store
+db-data
