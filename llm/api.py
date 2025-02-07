@@ -1,3 +1,4 @@
+import yaml
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -5,7 +6,9 @@ from pydantic import BaseModel
 from llm.interview_chain import InterviewChain
 
 app = FastAPI()
-interview_chain = InterviewChain()
+
+config = yaml.safe_load(open("llm/config.yml"))
+interview_chain = InterviewChain(config)
 
 app.add_middleware(
     CORSMiddleware,
@@ -14,6 +17,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 
 class CandidateInfo(BaseModel):
     name: str
@@ -44,6 +48,7 @@ async def generate_question(request: UserInput):
     else:
         llm_response = interview_chain.generate_question(request.user_input)
         return {"question": llm_response}
+
 
 @app.post("/generate_evaluation")
 async def generate_evaluation():

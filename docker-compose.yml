@@ -7,12 +7,13 @@ services:
       - "8000:8000"
     environment:
       - OLLAMA_URL=http://ollama:11434/
-      - FASTAPI_PORT=8000
+      - TOKENIZERS_PARALLELISM=false
     networks:
       - localnet
     volumes:
       - ./llm:/app/llm
       - ./artifacts:/app/artifacts
+      - ./rag_docs:/app/rag_docs
 
   ollama:
     image: ollama/ollama:latest
@@ -33,6 +34,8 @@ services:
       - localnet
     volumes:
       - ./frontend:/app/frontend
+    environment:
+      - BACKEND_URL=http://llm:8000
 
 networks:
   localnet:
