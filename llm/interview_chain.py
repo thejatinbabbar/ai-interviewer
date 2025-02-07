@@ -9,6 +9,7 @@ from langchain_core.prompts import PromptTemplate
 from langchain_huggingface import HuggingFaceEmbeddings
 import logging
 from llm.prompts import evaluation_system_prompt, interview_system_prompt
+import uuid
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
@@ -18,11 +19,13 @@ class InterviewChain:
         self.config = config
         self.logger = logging.getLogger(__name__)
         self.llm_url = os.environ["OLLAMA_URL"]
+        self.db_url = os.environ["DB_SERVICE_URL"]
         self.candidate_info = None
         self.history = None
         self.max_questions = self.config["max_questions"]
         self.question_count = 0
         self.vectorstore = self.init_vectorstore()
+        self.session_id = None
 
     def init_candidate_info(self):
         self.candidate_info = {
@@ -36,6 +39,7 @@ class InterviewChain:
         self.history = ""
         self.init_candidate_info()
         self.question_count = 0
+        self.session_id = uuid.uuid4()
 
     def init_vectorstore(self):
         embedding = HuggingFaceEmbeddings(model_name=self.config["embedding_model"])
@@ -109,16 +113,20 @@ class InterviewChain:
     def save_interview(self, evaluation):
         self.logger.info("Saving interview data.")
         interview = {
-            "candidate_info": self.candidate_info,
-            "history": self.history,
+            "session_id": str(self.session_id),
+            "user": json.dumps(self.candidate_info),
+            "conversation": self.history,
             "evaluation": evaluation,
         }
-        interview_filename = f'interview_{self.candidate_info["name"]}_{self.candidate_info["role"]}.json'.replace(
-            " ", "_"
-        )
-        with open("artifacts/interviews/" + interview_filename, "w") as f:
-            json.dump(interview, f)
-        self.logger.info(f"Interview data saved to {interview_filename}.")
+
+        try:
+            response = requests.post(f"{self.db_url}/log", json=interview, timeout=None)
+            response.raise_for_status()
+        except Exception as e:
+            self.logger.error(f"Error saving interview data: {e}")
+        
+        self.logger.info(f"db response: {response}")
+        self.logger.info(f"Interview data saved.")
         return
 
     def process_llm_response(self, response):
