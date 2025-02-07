@@ -7,7 +7,10 @@ format:
 	isort --profile black .
 
 clean:
-	rm -rf *.pyc
+	rm -rf *.pyc __pycache__ .pytest_cache .coverage .mypy_cache
 
 install:
-	pip install -r requirements-dev.txt
+	pip install -r requirements-dev.txt && \
+	pip install -r llm/requirements.txt && \
+	pip install -r frontend/requirements.txt && \
+	pip install -r db/requirements.txt

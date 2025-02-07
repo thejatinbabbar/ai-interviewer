@@ -49,7 +49,7 @@
 
 2. **Install Development Dependencies:**
 
-   Run the following command to install formatting tools:
+   First, create a virtual environment (e.g. with venv or conda), activate the environment, and run the following command to install formatting tools:
    ```sh
    make install
    ```
