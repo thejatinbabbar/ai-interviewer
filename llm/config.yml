@@ -5,6 +5,5 @@ text_splitter:
   chunk_size: 500
   chunk_overlap: 100
 ollama:
-  # model: "llama3.2:1b"
-  model: "qwen:0.5b"
+  model: "llama3.2:1b"
   max_tokens: 20
