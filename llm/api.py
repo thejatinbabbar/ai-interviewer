@@ -15,6 +15,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 class CandidateInfo(BaseModel):
     name: str
     role: str
@@ -44,6 +45,7 @@ async def generate_question(request: UserInput):
     else:
         llm_response = interview_chain.generate_question(request.user_input)
         return {"question": llm_response}
+
 
 @app.post("/generate_evaluation")
 async def generate_evaluation():

@@ -7,7 +7,6 @@ services:
       - "8000:8000"
     environment:
       - OLLAMA_URL=http://ollama:11434/
-      - FASTAPI_PORT=8000
     networks:
       - localnet
     volumes:
@@ -33,6 +32,8 @@ services:
       - localnet
     volumes:
       - ./frontend:/app/frontend
+    environment:
+      - BACKEND_URL=http://llm:8000
 
 networks:
   localnet:

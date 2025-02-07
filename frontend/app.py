@@ -29,6 +29,7 @@ def call_start_endpoint(user_info: dict):
     data = response.json()["question"]
     return data
 
+
 async def call_chat_endpoint(user_response: str):
     timeout = httpx.Timeout(30.0)
     async with httpx.AsyncClient(timeout=timeout) as client:
@@ -37,6 +38,7 @@ async def call_chat_endpoint(user_response: str):
         response.raise_for_status()
         data = response.json()
         return data
+
 
 async def call_finish_endpoint():
     async with httpx.AsyncClient(timeout=httpx.Timeout(30.0)) as client:
@@ -54,6 +56,7 @@ def reset_app():
     for key in list(st.session_state.keys()):
         del st.session_state[key]
     st.rerun()
+
 
 initialize_session()
 
