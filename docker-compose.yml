@@ -8,6 +8,7 @@ services:
     environment:
       - OLLAMA_URL=http://ollama:11434/
       - TOKENIZERS_PARALLELISM=false
+      - DB_SERVICE_URL=http://db-service:8001
     networks:
       - localnet
     volumes:
@@ -36,6 +37,18 @@ services:
       - ./frontend:/app/frontend
     environment:
       - BACKEND_URL=http://llm:8000
+
+  db-service:
+    build:
+      context: .
+      dockerfile: db/Dockerfile
+    ports:
+      - "8001:8001"
+    volumes:
+      - ./db:/app/db
+      - ./db-data:/app
+    networks:
+      - localnet
 
 networks:
   localnet:
