@@ -7,11 +7,13 @@ services:
       - "8000:8000"
     environment:
       - OLLAMA_URL=http://ollama:11434/
+      - TOKENIZERS_PARALLELISM=false
     networks:
       - localnet
     volumes:
       - ./llm:/app/llm
       - ./artifacts:/app/artifacts
+      - ./rag_docs:/app/rag_docs
 
   ollama:
     image: ollama/ollama:latest

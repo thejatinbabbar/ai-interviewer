@@ -7,19 +7,22 @@ from langchain_community.document_loaders import DirectoryLoader, TextLoader
 from langchain_community.vectorstores import FAISS
 from langchain_core.prompts import PromptTemplate
 from langchain_huggingface import HuggingFaceEmbeddings
+import logging
+from llm.prompts import evaluation_system_prompt, interview_system_prompt
 
-from llm.config import evaluation_system_prompt, interview_system_prompt
-
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 class InterviewChain:
 
-    def __init__(self):
+    def __init__(self, config):
+        self.config = config
+        self.logger = logging.getLogger(__name__)
         self.llm_url = os.environ["OLLAMA_URL"]
-        self.vectorstore = self.init_vectorstore()
         self.candidate_info = None
         self.history = None
-        self.max_questions = 3
+        self.max_questions = self.config["max_questions"]
         self.question_count = 0
+        self.vectorstore = self.init_vectorstore()
 
     def init_candidate_info(self):
         self.candidate_info = {
@@ -29,15 +32,16 @@ class InterviewChain:
         }
 
     def init_new_session(self):
+        self.logger.info("Initializing new interview session.")
         self.history = ""
         self.init_candidate_info()
         self.question_count = 0
 
     def init_vectorstore(self):
-        embedding = HuggingFaceEmbeddings(model_name="artifacts/models/all-MiniLM-L6-v2")
-        dir_loader = DirectoryLoader("artifacts/books", glob="**/*.txt", loader_cls=TextLoader)
+        embedding = HuggingFaceEmbeddings(model_name=self.config["embedding_model"])
+        dir_loader = DirectoryLoader(self.config["rag_dir_path"], glob="**/*.txt", loader_cls=TextLoader)
         docs = dir_loader.load()
-        splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
+        splitter = RecursiveCharacterTextSplitter(chunk_size=self.config["text_splitter"]["chunk_size"], chunk_overlap=self.config["text_splitter"]["chunk_overlap"])
         docs = splitter.split_documents(docs)
         vectorstore = FAISS.from_documents(docs, embedding)
         return vectorstore
@@ -52,7 +56,6 @@ class InterviewChain:
         prompt = prompt_template.format(
             context=context,
             history=self.history,
-            user_input=user_input,
         )
         return prompt
 
@@ -104,6 +107,7 @@ class InterviewChain:
         return response
 
     def save_interview(self, evaluation):
+        self.logger.info("Saving interview data.")
         interview = {
             "candidate_info": self.candidate_info,
             "history": self.history,
@@ -114,15 +118,21 @@ class InterviewChain:
         )
         with open("artifacts/interviews/" + interview_filename, "w") as f:
             json.dump(interview, f)
-
+        self.logger.info(f"Interview data saved to {interview_filename}.")
         return
 
+    def process_llm_response(self, response):
+        response = response.split("?\n\n")[0]
+        return response
+
     def call_llm(self, prompt):
+        self.logger.info("Calling LLM with prompt: %s", prompt)
         data = {
-            "model": "llama3.2:1b",
+            "model": self.config["ollama"]["model"],
             "prompt": prompt,
             "stream": False,
-            "max_tokens": 200,
+            "max_tokens": self.config["ollama"]["max_tokens"],
         }
-        response = requests.post(f"{self.llm_url}/api/generate", json=data)
-        return response.json()["response"]
+        response = requests.post(f"{self.llm_url}/api/generate", json=data).json()["response"]
+        response = self.process_llm_response(response)
+        return response

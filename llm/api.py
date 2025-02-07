@@ -3,9 +3,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from llm.interview_chain import InterviewChain
+import yaml
 
 app = FastAPI()
-interview_chain = InterviewChain()
+
+config = yaml.safe_load(open("llm/config.yml"))
+interview_chain = InterviewChain(config)
 
 app.add_middleware(
     CORSMiddleware,
