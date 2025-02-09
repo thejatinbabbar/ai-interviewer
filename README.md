@@ -31,7 +31,6 @@
 
 ### Prerequisites
 - Docker and Docker Compose
-- Python 3.9
 - Ollama: This project requires Ollama installed on your machine. Once you select a model, add the model name in the config.yml and run the following command to download the model locally:
   
   ```sh
@@ -47,19 +46,11 @@
    cd <repository-folder>
    ```
 
-2. **Install Development Dependencies:**
-
-   First, create a virtual environment (e.g. with venv or conda), activate the environment, and run the following command to install formatting tools:
-   ```sh
-   make install
-   ```
-   This installs the dependencies listed in requirements files.
-
-3. **Run Locally Using Docker Compose:**
+2. **Run Locally Using Docker Compose:**
 
    Build and run the services:
    ```sh
-   docker-compose up --build
+   docker compose up --build
    ```
    - **llm** service will be available on port 8000.
    - **frontend** (Streamlit) will be available on port 8501.

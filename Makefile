@@ -14,3 +14,6 @@ install:
 	pip install -r llm/requirements.txt && \
 	pip install -r frontend/requirements.txt && \
 	pip install -r db/requirements.txt
+
+build-local:
+	docker compose up -d
