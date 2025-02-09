@@ -147,7 +147,7 @@ class InterviewChain:
             response = "End of conversation."
         else:
             context = self.get_context()
-            prompt = self.create_question_prompt(context, user_input)
+            prompt = self.create_question_prompt(context)
             response = self.call_llm(prompt)
         self.update_history(response, "Chatbot")
         self.question_count += 1
