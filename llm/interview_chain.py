@@ -10,7 +10,7 @@ from langchain_community.vectorstores import FAISS
 from langchain_core.prompts import PromptTemplate
 from langchain_huggingface import HuggingFaceEmbeddings
 
-from llm.prompts import evaluation_system_prompt, interview_system_prompt
+from llm.prompts import evaluation_system_prompt, interview_system_prompt, interview_user_prompt, evaluation_user_prompt
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
@@ -93,7 +93,7 @@ class InterviewChain:
         Returns:
             str: The formatted prompt.
         """
-        prompt_template = PromptTemplate.from_template(interview_system_prompt)
+        prompt_template = PromptTemplate.from_template(interview_user_prompt)
         prompt = prompt_template.format(
             context=context,
             history=self.history,
@@ -107,7 +107,7 @@ class InterviewChain:
         Returns:
             str: The formatted evaluation prompt.
         """
-        prompt_template = PromptTemplate.from_template(evaluation_system_prompt)
+        prompt_template = PromptTemplate.from_template(evaluation_user_prompt)
         prompt = prompt_template.format(history=self.history)
         return prompt
 
@@ -128,7 +128,7 @@ class InterviewChain:
         Returns:
             str: Concatenated context string.
         """
-        results = self.vectorstore.similarity_search(self.history, k=3)
+        results = self.vectorstore.similarity_search(self.history, k=1)
         context = "\n".join([doc.page_content for doc in results])
         return context
 
@@ -142,14 +142,15 @@ class InterviewChain:
         Returns:
             str: Generated interview question.
         """
-        self.update_history(user_input, "User")
         if self.question_count > self.max_questions:
-            response = "End of conversation."
+            return None
         else:
             context = self.get_context()
+            self.update_history(user_input, "Candidate")
             prompt = self.create_question_prompt(context)
-            response = self.call_llm(prompt)
-        self.update_history(response, "Chatbot")
+            response = self.call_llm(prompt, interview_system_prompt, stopwords=["Candidate:", f"\n{self.candidate_info['name']}", "(Note"])
+
+        self.update_history(response, "Interviewer")
         self.question_count += 1
         return response
 
@@ -170,7 +171,7 @@ class InterviewChain:
             str: Generated evaluation.
         """
         prompt = self.create_evaluation_prompt()
-        response = self.call_llm(prompt)
+        response = self.call_llm(prompt, evaluation_system_prompt, stopwords=[])
         return response
 
     def save_interview(self, evaluation: str) -> None:
@@ -205,10 +206,14 @@ class InterviewChain:
         Returns:
             str: Processed response.
         """
-        processed_response = response.split("?\n\n")[0]
-        return processed_response
+        if response.startswith("Interviewer:"):
+            response = response.split("Interviewer:")[1].strip()
 
-    def call_llm(self, prompt: str) -> str:
+        if ":\n\n" in response:
+            response = response.split(":\n\n")[1].strip()
+        return response
+
+    def call_llm(self, prompt: str, system_prompt: str, stopwords: list) -> str:
         """
         Call the external LLM API with the provided prompt.
 
@@ -218,13 +223,20 @@ class InterviewChain:
         Returns:
             str: Processed response from the LLM.
         """
-        self.logger.info("Calling LLM with prompt: %s", prompt)
         data = {
             "model": self.config["ollama"]["model"],
+            "system": system_prompt,
             "prompt": prompt,
             "stream": False,
-            "max_tokens": self.config["ollama"]["max_tokens"],
+            "options": {
+                "temperature": self.config["ollama"]["temperature"],
+                "top_p": self.config["ollama"]["top_p"],
+                "stop": stopwords,
+                "repeat_penalty": self.config["ollama"]["repeat_penalty"],
+            }
         }
-        response = requests.post(f"{self.llm_url}/api/generate", json=data).json()["response"]
-        processed = self.process_llm_response(response)
+        self.logger.info(f"Calling LLM with payload: {data}")
+        response = requests.post(f"{self.llm_url}/api/generate", json=data).json()
+        self.logger.info(f"LLM response: {response}")
+        processed = self.process_llm_response(response["response"])
         return processed

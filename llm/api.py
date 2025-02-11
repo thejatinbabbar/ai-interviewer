@@ -46,6 +46,8 @@ async def generate_question(request: UserInput):
         # If the number of asked questions exceeds the maximum,
         # end the interview and return a completion message.
         llm_response = "Thank you for your time. The interview is now complete."
+        interview_chain.update_history(request.user_input, "Candidate")
+        interview_chain.update_history(llm_response, "Interviewer")
         return {"question": llm_response, "finish_interview": True}
     else:
         # Generate a new question based on the user's input.
