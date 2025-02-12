@@ -6,6 +6,6 @@ text_splitter:
   chunk_overlap: 100
 ollama:
   model: "llama3.2:1b"
-  temperature: 20
+  temperature: 0.3
   top_p: 0.9
   repeat_penalty: 1.5
