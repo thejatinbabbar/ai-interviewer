@@ -10,7 +10,12 @@ from langchain_community.vectorstores import FAISS
 from langchain_core.prompts import PromptTemplate
 from langchain_huggingface import HuggingFaceEmbeddings
 
-from llm.prompts import evaluation_system_prompt, interview_system_prompt, interview_user_prompt, evaluation_user_prompt
+from llm.prompts import (
+    evaluation_system_prompt,
+    evaluation_user_prompt,
+    interview_system_prompt,
+    interview_user_prompt,
+)
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
@@ -148,7 +153,9 @@ class InterviewChain:
             context = self.get_context()
             self.update_history(user_input, "Candidate")
             prompt = self.create_question_prompt(context)
-            response = self.call_llm(prompt, interview_system_prompt, stopwords=["Candidate:", f"\n{self.candidate_info['name']}", "(Note"])
+            response = self.call_llm(
+                prompt, interview_system_prompt, stopwords=["Candidate:", f"\n{self.candidate_info['name']}", "(Note"]
+            )
 
         self.update_history(response, "Interviewer")
         self.question_count += 1
@@ -233,7 +240,7 @@ class InterviewChain:
                 "top_p": self.config["ollama"]["top_p"],
                 "stop": stopwords,
                 "repeat_penalty": self.config["ollama"]["repeat_penalty"],
-            }
+            },
         }
         self.logger.info(f"Calling LLM with payload: {data}")
         response = requests.post(f"{self.llm_url}/api/generate", json=data).json()
