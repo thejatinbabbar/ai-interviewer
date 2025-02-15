@@ -34,10 +34,14 @@ def call_start_endpoint(user_info: dict) -> str:
     Returns:
         str: The starting question.
     """
-    response = requests.post(START_URL, json=user_info)
-    response.raise_for_status()
-    data = response.json()
-    return data["question"]
+    try:
+        response = requests.post(START_URL, json=user_info)
+        response.raise_for_status()
+        data = response.json()
+        return data["question"]
+    except requests.RequestException as e:
+        st.sidebar.error(f"Error starting interview: {e}")
+        return None
 
 
 async def call_chat_endpoint(user_response: str) -> dict:
@@ -51,11 +55,15 @@ async def call_chat_endpoint(user_response: str) -> dict:
         The response data including the question.
     """
     async with httpx.AsyncClient(timeout=None) as client:
-        payload = {"user_input": user_response}
-        response = await client.post(CHAT_URL, json=payload)
-        response.raise_for_status()
-        data = response.json()
-        return data
+        try:
+            payload = {"user_input": user_response}
+            response = await client.post(CHAT_URL, json=payload)
+            response.raise_for_status()
+            data = response.json()
+            return data
+        except httpx.RequestError as e:
+            st.error(f"Error generating question: {e}")
+            return {"question": "Error generating question. Please try again."}
 
 
 async def call_finish_endpoint() -> dict:
@@ -66,10 +74,14 @@ async def call_finish_endpoint() -> dict:
         dict: The data returned after finishing the interview.
     """
     async with httpx.AsyncClient(timeout=None) as client:
-        response = await client.post(FINISH_URL)
-        response.raise_for_status()
-        data = response.json()
-        return data
+        try:
+            response = await client.post(FINISH_URL)
+            response.raise_for_status()
+            data = response.json()
+            return data
+        except httpx.RequestError as e:
+            st.error(f"Error finishing interview: {e}")
+            return {"message": "Error finishing interview. Please try again."}
 
 
 def finish_in_background() -> None:
