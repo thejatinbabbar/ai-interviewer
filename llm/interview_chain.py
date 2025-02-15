@@ -243,7 +243,13 @@ class InterviewChain:
             },
         }
         self.logger.info(f"Calling LLM with payload: {data}")
-        response = requests.post(f"{self.llm_url}/api/generate", json=data).json()
-        self.logger.info(f"LLM response: {response}")
-        processed = self.process_llm_response(response["response"])
+        try:
+            response = requests.post(f"{self.llm_url}/api/generate", json=data)
+            response.raise_for_status()
+            response_data = response.json()
+        except requests.RequestException as e:
+            self.logger.error(f"Error calling LLM: {e}")
+            return "Error generating response from LLM."
+        self.logger.info(f"LLM response: {response_data}")
+        processed = self.process_llm_response(response_data["response"])
         return processed
